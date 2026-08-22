@@ -18,8 +18,3 @@ OneDrive/
       ├─ Decision Logs/
       └─ Portfolio/
 
-File Path Examples:
-- Week 01 folder: OneDrive > GEAP 103 > Week 01
-- Goal Document folder: OneDrive > GEAP 103 > Goal Document
-- Decision Logs folder: OneDrive > GEAP 103 > Decision Logs
-- Portfolio folder: OneDrive > GEAP 103 > Portfolio
