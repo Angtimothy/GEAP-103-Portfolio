@@ -1,0 +1,9 @@
+Category | Details
+--- | ---
+Task goal | Help me invest 20,000 in etfs in Canada
+Tool used | Copilot in M365
+Prompt snippets | Help me invest. (new) help me invest in etfs
+Output Summary | 1st too general, 2nd more specific, 3rd even more specific, needed 2 edits
+Decision | modify
+Verification | Etfs are real, good choices, TFSA is a real advantageous investment vehicle, investing monthly is a real recommendation by experts
+What changed | Gave more specific advice to my financial situation
