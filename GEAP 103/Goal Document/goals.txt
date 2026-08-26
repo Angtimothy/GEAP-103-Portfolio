@@ -58,3 +58,21 @@ Update week 2
 
  
 • "Today I discovered that __there are all in one etfs___, which I didn't know before."
+
+Week 5
+
+"The person using my project might have trouble with __my file system map___ because __it is not accesible_." 
+
+"I need to check __accessibility (headings, fonts, navigation headings)___ to make sure it's accessible." 
+
+"One thing I learned today that applies to my project is ___I need to verify what ai generates as it sometimes forgets to do things or makes mistakes___." 
+
+ 
+
+Entry 6
+
+"My project involves data about __etfs___. I would want to show __growth in $ and % profit___." 
+
+"A spreadsheet would help me ___track/org types of etfs__ because __I want ai to help create an investment portfolio__." 
+
+"I didn't expect ___ai can manipulate numbers but also make mistakes like not labeling the axis__ about working with data today."
