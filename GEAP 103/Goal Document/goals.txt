@@ -67,3 +67,12 @@ Week 5
 
 "One thing I learned today that applies to my project is ___I need to verify what ai generates as it sometimes forgets to do things or makes mistakes___." 
 
+ 
+
+Entry 6
+
+"My project involves data about __etfs___. I would want to show __growth in $ and % profit___." 
+
+"A spreadsheet would help me ___track/org types of etfs__ because __I want ai to help create an investment portfolio__." 
+
+"I didn't expect ___ai can manipulate numbers but also make mistakes like not labeling the axis__ about working with data today."
