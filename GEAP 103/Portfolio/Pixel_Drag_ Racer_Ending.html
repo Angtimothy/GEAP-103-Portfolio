@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Drag Racer - Championship Edition</title>
+    <style>
+        body {
+            background-color: #111;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        canvas {
+            border: 4px solid #fff;
+            background-color: #222;
+            image-rendering: pixelated;
+        }
+        .controls-info {
+            margin-top: 15px;
+            text-align: center;
+            background: #222;
+            padding: 10px 20px;
+            border: 2px solid #555;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="600" height="360"></canvas>
+<div class="controls-info">
+    <p><strong>GAME CONTROLS:</strong> [W]/[UP] Gas | [S]/[DOWN] Brake/Navigate | [SPACE] Shift | [R] Action | [D] Dealership</p>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// --- Audio System ---
+let audioCtx = null;
+let engineOsc = null;
+let engineGain = null;
+
+function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    engineOsc = audioCtx.createOscillator();
+    engineGain = audioCtx.createGain();
+    engineOsc.type = 'sawtooth';
+    engineOsc.frequency.setValueAtTime(60, audioCtx.currentTime);
+    engineGain.gain.setValueAtTime(0, audioCtx.currentTime);
+    engineOsc.connect(engineGain);
+    engineGain.connect(audioCtx.destination);
+    engineOsc.start();
+}
+
+function updateAudio() {
+    if (!audioCtx) return;
+    if (gameState === 'RACING' || gameState === 'FINISH_ANIM') {
+        const pitch = 50 + (rpm / playerCar.maxRpm) * 200;
+        engineOsc.frequency.setTargetAtTime(pitch, audioCtx.currentTime, 0.05);
+        const isGasPressed = keys['KeyW'] || keys['ArrowUp'];
+        const targetVol = (isGasPressed && gameState === 'RACING') ? 0.15 : 0.05;
+        engineGain.gain.setTargetAtTime(targetVol, audioCtx.currentTime, 0.05);
+    } else {
+        engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+    }
+}
+
+function playShiftSound(isPerfect) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(isPerfect ? 600 : 200, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+}
+
+function playVictoryFanfare() {
+    if (!audioCtx) return;
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.12);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.12 + 0.3);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + i * 0.12);
+        osc.stop(audioCtx.currentTime + i * 0.12 + 0.3);
+    });
+}
+
+// --- Car Dealership Data ---
+const carShop = [
+    { name: "Stock Cruiser", price: 0, color: "#e74c3c", gearLimits: [0, 60, 110, 160, 210, 260], accelMult: 1.0, maxRpm: 8000, desc: "Reliable entry-level vehicle." },
+    { name: "Street Tuner", price: 75, color: "#3498db", gearLimits: [0, 70, 125, 180, 235, 290], accelMult: 1.25, maxRpm: 8500, desc: "Upgraded turbo & gear ratios." },
+    { name: "Hyper Beast", price: 200, color: "#f1c40f", gearLimits: [0, 85, 145, 205, 265, 330], accelMult: 1.55, maxRpm: 9000, desc: "Pro dragster with extreme speed." }
+];
+
+let playerMoney = 50;
+let ownedCars = [0];
+let currentCarIndex = 0;
+let dealerSelectedIdx = 0;
+let playerCar = carShop[0];
+
+// --- Opponents ---
+const opponents = [
+    { name: "Rookie Rick", title: "Stage 1", color: "#2ecc71", quote: "'I just bought this car yesterday!'", topSpeedMult: 0.82, shiftAccuracy: 0.65, reactionTime: 0.5 },
+    { name: "Speedy Sam", title: "Stage 2", color: "#e67e22", quote: "'Eat my dust, amateur!'", topSpeedMult: 0.98, shiftAccuracy: 0.85, reactionTime: 0.2 },
+    { name: "Baron Von Burnout", title: "Stage 3", color: "#9b59b6", quote: "'You think you can beat perfection?'", topSpeedMult: 1.22, shiftAccuracy: 0.98, reactionTime: 0.05 }
+];
+
+let currentOpponentIndex = 0;
+let currentWager = 10;
+
+// --- Game States ---
+let gameState = 'PRE_RACE';
+let previousStateBeforeDealer = 'PRE_RACE';
+
+let distanceTraveled = 0;
+let opponentDistance = 0;
+let speed = 0;
+let opponentSpeed = 0;
+let rpm = 1000;
+let opponentRpm = 1000;
+let currentGear = 1;
+let opponentGear = 1;
+let opponentStartDelay = 0;
+const totalDistance = 402;
+let raceTime = 0;
+let lastTime = 0;
+let winner = null;
+let endingTimer = 0;
+
+let cameraX = 0;
+let playerWorldX = 0;
+let opponentWorldX = 0;
+let finishLineWorldX = 0;
+
+const minRpm = 1000;
+const shiftOptimalMin = 6500;
+const shiftOptimalMax = 7500;
+let shiftFeedback = '';
+let shiftFeedbackColor = '#fff';
+let shiftFeedbackTimer = 0;
+
+const keys = {};
+
+window.addEventListener('keydown', (e) => {
+    initAudio();
+    
+    if (e.code === 'Space' && !keys['Space']) {
+        if (gameState === 'RACING') shiftGear();
+    }
+    
+    if (gameState === 'PRE_RACE') {
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+            currentWager = Math.min(playerMoney, currentWager + 5);
+        }
+        if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+            currentWager = Math.max(0, currentWager - 5);
+        }
+        if (e.code === 'KeyD') {
+            previousStateBeforeDealer = 'PRE_RACE';
+            dealerSelectedIdx = currentCarIndex;
+            gameState = 'DEALERSHIP';
+        }
+        if (e.code === 'KeyR') {
+            resetRace();
+            gameState = 'RACING';
+        }
+    }
+
+    if (gameState === 'DEALERSHIP') {
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+            dealerSelectedIdx = (dealerSelectedIdx - 1 + carShop.length) % carShop.length;
+        }
+        if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+            dealerSelectedIdx = (dealerSelectedIdx + 1) % carShop.length;
+        }
+        if (e.code === 'KeyB' || e.code === 'Space' || e.code === 'KeyR') {
+            handleCarSelection();
+        }
+        if (e.code === 'Escape' || e.code === 'KeyE') {
+            gameState = previousStateBeforeDealer;
+        }
+    }
+
+    if (gameState === 'FINISHED') {
+        if (e.code === 'KeyR') {
+            resetRace();
+            gameState = 'PRE_RACE';
+        }
+        if (e.code === 'KeyN' && winner === 'PLAYER') {
+            if (currentOpponentIndex < opponents.length - 1) {
+                currentOpponentIndex++;
+                resetRace();
+                gameState = 'PRE_RACE';
+            } else {
+                playVictoryFanfare();
+                endingTimer = 0;
+                gameState = 'GRAND_VICTORY';
+            }
+        }
+        if (e.code === 'KeyD') {
+            previousStateBeforeDealer = 'FINISHED';
+            dealerSelectedIdx = currentCarIndex;
+            gameState = 'DEALERSHIP';
+        }
+    }
+
+    if (gameState === 'GRAND_VICTORY') {
+        if (e.code === 'KeyR') {
+            currentOpponentIndex = 0;
+            resetRace();
+            gameState = 'PRE_RACE';
+        }
+    }
+
+    keys[e.code] = true;
+});
+
+window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+function handleCarSelection() {
+    const car = carShop[dealerSelectedIdx];
+    if (ownedCars.includes(dealerSelectedIdx)) {
+        currentCarIndex = dealerSelectedIdx;
+        playerCar = carShop[currentCarIndex];
+    } else if (playerMoney >= car.price) {
+        playerMoney -= car.price;
+        ownedCars.push(dealerSelectedIdx);
+        currentCarIndex = dealerSelectedIdx;
+        playerCar = carShop[currentCarIndex];
+    }
+}
+
+function shiftGear() {
+    if (currentGear < 5) {
+        let isPerfect = false;
+        if (rpm >= shiftOptimalMin && rpm <= shiftOptimalMax) {
+            shiftFeedback = 'PERFECT SHIFT!';
+            shiftFeedbackColor = '#00ff00';
+            speed += 12; 
+            isPerfect = true;
+        } else if (rpm > shiftOptimalMax) {
+            shiftFeedback = 'LATE SHIFT!';
+            shiftFeedbackColor = '#ff0000';
+        } else {
+            shiftFeedback = 'EARLY SHIFT!';
+            shiftFeedbackColor = '#ffff00';
+        }
+        playShiftSound(isPerfect);
+        currentGear++;
+        rpm = Math.max(minRpm, rpm * 0.55);
+        shiftFeedbackTimer = 60;
+    }
+}
+
+function resetRace() {
+    distanceTraveled = 0;
+    opponentDistance = 0;
+    speed = 0;
+    opponentSpeed = 0;
+    rpm = minRpm;
+    opponentRpm = minRpm;
+    currentGear = 1;
+    opponentGear = 1;
+    raceTime = 0;
+    shiftFeedback = '';
+    winner = null;
+    currentWager = Math.min(playerMoney, currentWager);
+    opponentStartDelay = opponents[currentOpponentIndex].reactionTime;
+}
+
+function updateOpponent(deltaTime) {
+    const opp = opponents[currentOpponentIndex];
+    if (opponentStartDelay > 0) {
+        opponentStartDelay -= deltaTime;
+        return;
+    }
+
+    const maxGearSpeed = playerCar.gearLimits[opponentGear] * opp.topSpeedMult;
+    if (opponentSpeed < maxGearSpeed) {
+        opponentSpeed += (0.14 * (5 - opponentGear + 1)) * opp.topSpeedMult;
+    }
+
+    const shiftTargetRpm = shiftOptimalMin + ((shiftOptimalMax - shiftOptimalMin) * opp.shiftAccuracy);
+    opponentRpm = minRpm + ((opponentSpeed / maxGearSpeed) * (playerCar.maxRpm - minRpm));
+
+    if (opponentRpm >= shiftTargetRpm && opponentGear < 5) {
+        opponentGear++;
+        opponentRpm = minRpm;
+    }
+
+    opponentDistance += (opponentSpeed / 3.6) * deltaTime;
+}
+
+function update(deltaTime) {
+    updateAudio();
+
+    if (gameState === 'GRAND_VICTORY') {
+        endingTimer += deltaTime;
+        return;
+    }
+
+    if (gameState === 'PRE_RACE' || gameState === 'DEALERSHIP') return;
+
+    if (gameState === 'RACING') {
+        raceTime += deltaTime;
+
+        const isGasPressed = keys['KeyW'] || keys['ArrowUp'];
+        const isBrakePressed = keys['KeyS'] || keys['ArrowDown'];
+        const currentGearMaxSpeed = playerCar.gearLimits[currentGear];
+
+        if (isGasPressed) {
+            if (speed < currentGearMaxSpeed) {
+                speed += (0.15 * playerCar.accelMult * (5 - currentGear + 1)); 
+            } else {
+                speed -= 0.05;
+            }
+            const targetRpm = minRpm + ((speed / currentGearMaxSpeed) * (playerCar.maxRpm - minRpm));
+            rpm = Math.min(playerCar.maxRpm, Math.max(rpm, targetRpm));
+        } else {
+            speed = Math.max(0, speed - 0.1);
+            rpm = Math.max(minRpm, rpm - 100);
+        }
+
+        if (isBrakePressed) {
+            speed = Math.max(0, speed - 0.4);
+            rpm = Math.max(minRpm, rpm - 200);
+        }
+
+        distanceTraveled += (speed / 3.6) * deltaTime;
+        updateOpponent(deltaTime);
+
+        if (distanceTraveled >= totalDistance || opponentDistance >= totalDistance) {
+            winner = distanceTraveled >= opponentDistance ? 'PLAYER' : 'OPPONENT';
+            gameState = 'FINISH_ANIM';
+        }
+    }
+
+    if (gameState === 'FINISH_ANIM') {
+        raceTime += deltaTime;
+        distanceTraveled += (speed / 3.6) * deltaTime;
+        opponentDistance += (opponentSpeed / 3.6) * deltaTime;
+
+        const leaderDist = Math.max(distanceTraveled, opponentDistance);
+        if (leaderDist >= totalDistance + 80) {
+            gameState = 'FINISHED';
+            if (winner === 'PLAYER') {
+                playerMoney += currentWager;
+            } else {
+                playerMoney = Math.max(0, playerMoney - currentWager);
+            }
+        }
+    }
+
+    if (shiftFeedbackTimer > 0) shiftFeedbackTimer--;
+
+    playerWorldX = 100 + (distanceTraveled * 5);
+    opponentWorldX = 100 + (opponentDistance * 5);
+    finishLineWorldX = 100 + (totalDistance * 5);
+    cameraX = playerWorldX - 100;
+}
+
+function drawPixelCar(worldX, y, bodyColor) {
+    const screenX = worldX - cameraX;
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(screenX, y + 8, 50, 12);
+    ctx.fillRect(screenX + 10, y, 28, 10);
+
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(screenX + 24, y + 2, 12, 6);
+
+    ctx.fillStyle = '#111';
+    ctx.fillRect(screenX + 6, y + 16, 10, 10);
+    ctx.fillRect(screenX + 34, y + 16, 10, 10);
+    
+    ctx.fillStyle = '#95a5a6';
+    ctx.fillRect(screenX + 8, y + 18, 6, 6);
+    ctx.fillRect(screenX + 36, y + 18, 6, 6);
+}
+
+function drawStandaloneCar(x, y, bodyColor) {
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(x, y + 8, 80, 20);
+    ctx.fillRect(x + 16, y - 6, 46, 16);
+
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(x + 38, y - 2, 20, 10);
+
+    ctx.fillStyle = '#111';
+    ctx.fillRect(x + 10, y + 20, 16, 16);
+    ctx.fillRect(x + 54, y + 20, 16, 16);
+    
+    ctx.fillStyle = '#95a5a6';
+    ctx.fillRect(x + 14, y + 24, 8, 8);
+    ctx.fillRect(x + 58, y + 24, 8, 8);
+}
+
+function drawTrack() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, 160);
+
+    ctx.fillStyle = '#333';
+    ctx.fillRect(0, 160, canvas.width, 200);
+
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 230, canvas.width, 4);
+
+    const finishScreenX = finishLineWorldX - cameraX;
+    if (finishScreenX > -50 && finishScreenX < canvas.width + 100) {
+        for (let i = 0; i < 140; i += 10) {
+            ctx.fillStyle = (i % 20 === 0) ? '#fff' : '#000';
+            ctx.fillRect(finishScreenX, 160 + i, 16, 10);
+        }
+        
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(finishScreenX - 4, 130, 8, 170);
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(finishScreenX - 12, 120, 40, 15);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText('FINISH', finishScreenX - 10, 132);
+    }
+
+    ctx.fillStyle = '#f1c40f';
+    const offset = cameraX % 40;
+    for (let i = -40; i < canvas.width + 40; i += 40) {
+        ctx.fillRect(i - offset, 195, 20, 3);
+        ctx.fillRect(i - offset, 280, 20, 3);
+    }
+}
+
+function drawDashboard() {
+    const opp = opponents[currentOpponentIndex];
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(20, 15, 200, 25);
+    ctx.strokeStyle = '#fff';
+    ctx.strokeRect(20, 15, 200, 25);
+
+    const rpmPct = (rpm - minRpm) / (playerCar.maxRpm - minRpm);
+    let barColor = '#00ff00';
+    if (rpm >= shiftOptimalMin && rpm <= shiftOptimalMax) barColor = '#00ffff';
+    else if (rpm > shiftOptimalMax) barColor = '#ff0000';
+    
+    ctx.fillStyle = barColor;
+    ctx.fillRect(22, 17, Math.max(0, 196 * rpmPct), 21);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px monospace';
+    ctx.fillText(`RPM: ${Math.round(rpm)}`, 25, 32);
+
+    if (rpm >= shiftOptimalMin && gameState === 'RACING') {
+        ctx.fillStyle = (Math.floor(Date.now() / 100) % 2 === 0) ? '#ff0000' : '#ffff00';
+        ctx.font = 'bold 16px monospace';
+        ctx.fillText('SHIFT NOW! [SPACE]', 230, 32);
+    }
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '13px monospace';
+    ctx.fillText(`CAR: ${playerCar.name}`, 20, 55);
+    ctx.fillText(`CASH: $${playerMoney} | Wager: $${currentWager}`, 20, 72);
+    ctx.fillText(`SPEED: ${Math.round(speed)} km/h`, 20, 89);
+    ctx.fillText(`DIST: ${Math.min(totalDistance, Math.round(distanceTraveled))}m / ${totalDistance}m`, 20, 106);
+
+    ctx.fillStyle = opp.color;
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText(`RIVAL: ${opp.name}`, 380, 55);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '12px monospace';
+    ctx.fillText(`Rival Dist: ${Math.min(totalDistance, Math.round(opponentDistance))}m`, 380, 72);
+
+    if (shiftFeedbackTimer > 0) {
+        ctx.fillStyle = shiftFeedbackColor;
+        ctx.font = 'bold 16px monospace';
+        ctx.fillText(shiftFeedback, 230, 55);
+    }
+}
+
+function drawGrandVictoryEnding() {
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, 220);
+    skyGrad.addColorStop(0, '#0f051d');
+    skyGrad.addColorStop(1, '#3c1446');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, canvas.width, 220);
+
+    ctx.fillStyle = '#28282d';
+    ctx.fillRect(0, 220, canvas.width, 140);
+    ctx.fillStyle = '#46464b';
+    ctx.fillRect(0, 220, canvas.width, 4);
+
+    const carX = 230;
+    const carY = 210;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(carX - 10, carY + 30, 180, 15);
+
+    ctx.fillStyle = playerCar.color;
+    ctx.fillRect(carX, carY + 10, 160, 28);
+    ctx.fillRect(carX + 30, carY - 12, 90, 24);
+
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(carX + 75, carY - 6, 35, 14);
+
+    ctx.fillStyle = '#111';
+    ctx.fillRect(carX + 20, carY + 26, 26, 26);
+    ctx.fillRect(carX + 114, carY + 26, 26, 26);
+    ctx.fillStyle = '#95a5a6';
+    ctx.fillRect(carX + 27, carY + 33, 12, 12);
+    ctx.fillRect(carX + 121, carY + 33, 12, 12);
+
+    const pX = 175;
+    const pY = 195;
+    ctx.fillStyle = '#e0ac69';
+    ctx.fillRect(pX + 4, pY - 14, 10, 10);
+    ctx.fillStyle = '#2980b9';
+    ctx.fillRect(pX + 2, pY - 4, 14, 22);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(pX + 2, pY + 18, 6, 22);
+    ctx.fillRect(pX + 10, pY + 18, 6, 22);
+
+    ctx.fillStyle = '#e0ac69';
+    ctx.fillRect(pX - 4, pY - 16, 6, 16);
+    ctx.fillRect(pX + 16, pY - 16, 6, 16);
+
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillRect(pX - 8, pY - 34, 34, 18);
+    ctx.fillRect(pX + 4, pY - 16, 10, 6);
+    ctx.fillRect(pX - 2, pY - 10, 22, 6);
+    
+    if (Math.floor(endingTimer * 4) % 2 === 0) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(pX + 16, pY - 30, 4, 4);
+        ctx.fillRect(pX - 4, pY - 26, 3, 3);
+    }
+
+    opponents.forEach((opp, i) => {
+        const rx = 35 + (i * 42);
+        const ry = 215;
+
+        ctx.fillStyle = '#e0ac69';
+        ctx.fillRect(rx + 2, ry - 10, 8, 8);
+        ctx.fillStyle = opp.color;
+        ctx.fillRect(rx, ry - 2, 12, 18);
+        ctx.fillStyle = '#111';
+        ctx.fillRect(rx + 1, ry + 16, 4, 14);
+        ctx.fillRect(rx + 7, ry + 16, 4, 14);
+
+        const tearOffset = (Math.floor(endingTimer * 8) + (i * 3)) % 10;
+        ctx.fillStyle = '#50beff';
+        ctx.fillRect(rx - 1, ry - 2 + tearOffset, 3, 4);
+        ctx.fillRect(rx + 10, ry - 2 + tearOffset, 3, 4);
+        ctx.fillRect(rx - 6, ry + 28, 24, 4);
+    });
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f1c40f';
+    ctx.font = 'bold 22px monospace';
+    ctx.fillText('STREET KING! TOURNAMENT CHAMPION!', canvas.width / 2, 35);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '14px monospace';
+    ctx.fillText(`You conquered all 3 rivals in your ${playerCar.name}!`, canvas.width / 2, 60);
+
+    ctx.fillStyle = '#00ff00';
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText('Press [R] to Play Again', canvas.width / 2, 335);
+    ctx.textAlign = 'left';
+}
+
+function gameLoop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const deltaTime = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    update(deltaTime);
+
+    if (gameState === 'GRAND_VICTORY') {
+        drawGrandVictoryEnding();
+    } else {
+        drawTrack();
+        drawPixelCar(opponentWorldX, 175, opponents[currentOpponentIndex].color);
+        drawPixelCar(playerWorldX, 245, playerCar.color);
+        drawDashboard();
+
+        const opp = opponents[currentOpponentIndex];
+
+        if (gameState === 'PRE_RACE') {
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 18px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`STAGE ${currentOpponentIndex + 1}: vs ${opp.name}`, canvas.width / 2, 50);
+            
+            ctx.fillStyle = opp.color;
+            ctx.font = 'italic 14px monospace';
+            ctx.fillText(opp.quote, canvas.width / 2, 75);
+
+            ctx.fillStyle = '#f1c40f';
+            ctx.font = 'bold 15px monospace';
+            ctx.fillText(`YOUR WALLET: $${playerMoney}`, canvas.width / 2, 115);
+            
+            ctx.fillStyle = '#00ffff';
+            ctx.fillText(`RACE WAGER: $${currentWager}`, canvas.width / 2, 140);
+            ctx.fillStyle = '#aaa';
+            ctx.font = '12px monospace';
+            ctx.fillText(`(Press [UP] / [DOWN] to Adjust Wager)`, canvas.width / 2, 160);
+
+            ctx.fillStyle = '#e67e22';
+            ctx.font = 'bold 14px monospace';
+            ctx.fillText(`CURRENT RIDE: ${playerCar.name}`, canvas.width / 2, 195);
+
+            ctx.fillStyle = '#3498db';
+            ctx.fillText(`Press [D] to Visit Dealership`, canvas.width / 2, 225);
+
+            ctx.fillStyle = '#00ff00';
+            ctx.font = 'bold 16px monospace';
+            ctx.fillText('Press [R] to Start Race', canvas.width / 2, 275);
+            ctx.textAlign = 'left';
+        } else if (gameState === 'DEALERSHIP') {
+            ctx.fillStyle = 'rgba(10,10,20,0.95)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#f1c40f';
+            ctx.font = 'bold 20px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('--- PIXEL DEALERSHIP ---', canvas.width / 2, 40);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '14px monospace';
+            ctx.fillText(`Wallet: $${playerMoney}`, canvas.width / 2, 65);
+
+            carShop.forEach((car, index) => {
+                const yPos = 105 + (index * 40);
+                const isSelected = (index === dealerSelectedIdx);
+                const isOwned = ownedCars.includes(index);
+                const isCurrent = (index === currentCarIndex);
+
+                if (isSelected) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                    ctx.fillRect(60, yPos - 18, 480, 32);
+                    ctx.strokeStyle = '#f1c40f';
+                    ctx.strokeRect(60, yPos - 18, 480, 32);
+                }
+
+                ctx.textAlign = 'left';
+                ctx.fillStyle = isSelected ? '#fff' : '#888';
+                ctx.font = 'bold 14px monospace';
+                const prefix = isSelected ? '> ' : '  ';
+                ctx.fillText(`${prefix}${car.name}`, 80, yPos);
+
+                ctx.textAlign = 'right';
+                if (isCurrent) {
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillText('EQUIPPED', 520, yPos);
+                } else if (isOwned) {
+                    ctx.fillStyle = '#3498db';
+                    ctx.fillText('OWNED', 520, yPos);
+                } else {
+                    ctx.fillStyle = playerMoney >= car.price ? '#f1c40f' : '#ff0000';
+                    ctx.fillText(`$${car.price}`, 520, yPos);
+                }
+            });
+
+            const selCar = carShop[dealerSelectedIdx];
+            drawStandaloneCar(120, 240, selCar.color);
+
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#fff';
+            ctx.font = '12px monospace';
+            ctx.fillText(`Top Speed: ${selCar.gearLimits[5]} km/h`, 240, 240);
+            ctx.fillText(`Accel: x${selCar.accelMult}`, 240, 258);
+            ctx.fillText(`Max RPM: ${selCar.maxRpm}`, 240, 276);
+
+            ctx.fillStyle = '#aaa';
+            ctx.font = 'italic 11px monospace';
+            ctx.fillText(selCar.desc, 240, 295);
+
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#00ff00';
+            ctx.font = 'bold 13px monospace';
+            ctx.fillText('[W]/[S] Navigate | [SPACE]/[R] Select/Buy | [ESC]/[E] Back', canvas.width / 2, 335);
+            ctx.textAlign = 'left';
+        } else if (gameState === 'FINISHED') {
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.textAlign = 'center';
+            if (winner === 'PLAYER') {
+                ctx.fillStyle = '#00ff00';
+                ctx.font = 'bold 22px monospace';
+                ctx.fillText('YOU WIN THE RACE!', canvas.width / 2, 70);
+                ctx.fillStyle = '#f1c40f';
+                ctx.font = '16px monospace';
+                ctx.fillText(`Won Wager: +$${currentWager} | Wallet: $${playerMoney}`, canvas.width / 2, 105);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px monospace';
+                ctx.fillText('Press [R] to Rematch (Adjust Wager)', canvas.width / 2, 150);
+                if (currentOpponentIndex < opponents.length - 1) {
+                    ctx.fillText('Press [N] to Advance to Next Opponent', canvas.width / 2, 180);
+                } else {
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.font = 'bold 16px monospace';
+                    ctx.fillText('Press [N] to Claim Championship Trophy!', canvas.width / 2, 180);
+                }
+            } else {
+                ctx.fillStyle = '#ff0000';
+                ctx.font = 'bold 22px monospace';
+                ctx.fillText(`${opp.name.toUpperCase()} WINS!`, canvas.width / 2, 70);
+                ctx.fillStyle = '#e74c3c';
+                ctx.font = '16px monospace';
+                ctx.fillText(`Lost Wager: -$${currentWager} | Wallet: $${playerMoney}`, canvas.width / 2, 105);
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px monospace';
+                ctx.fillText('Press [R] to Retry (Adjust Wager)', canvas.width / 2, 150);
+            }
+
+            ctx.fillStyle = '#3498db';
+            ctx.font = 'bold 14px monospace';
+            ctx.fillText('Press [D] to Visit Dealership', canvas.width / 2, 220);
+
+            ctx.textAlign = 'left';
+        }
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
