@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Index Ledger — A Field Guide to ETF Investing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #EEF2EC;
+    --paper-2: #E4EAE1;
+    --ink: #172420;
+    --ink-soft: #435046;
+    --rule: #C6D0C1;
+    --gold: #B07F2A;
+    --gold-soft: #E7D3A6;
+    --teal: #2E5A50;
+    --teal-soft: #DCE7E1;
+    --rust: #A24631;
+    --rust-soft: #F0DAD2;
+    --paper-card: #F7F9F4;
+    --radius: 3px;
+    --max: 920px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--max); margin:0 auto; padding:0 28px;}
+  h1,h2,h3{font-family:'Fraunces', serif; font-weight:600; margin:0 0 .4em 0; letter-spacing:-0.01em;}
+  h1{font-size:clamp(2.1rem, 5vw, 3.1rem); line-height:1.05;}
+  h2{font-size:1.7rem;}
+  h3{font-size:1.15rem;}
+  p{margin:0 0 1em 0; color:var(--ink-soft);}
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  a{color:var(--teal);}
+
+  /* ledger texture header */
+  header.top{
+    border-bottom:1px solid var(--rule);
+    padding:18px 0;
+    position:sticky; top:0; z-index:50;
+    background:rgba(238,242,236,0.92);
+    backdrop-filter: blur(6px);
+  }
+  header.top .wrap{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:baseline; gap:10px;}
+  .brand .mark{font-family:'Fraunces', serif; font-weight:700; font-size:1.25rem;}
+  .brand .tag{font-size:.72rem; text-transform:uppercase; letter-spacing:.12em; color:var(--ink-soft);}
+  nav{display:flex; gap:18px; flex-wrap:wrap;}
+  nav a{
+    font-size:.82rem; text-transform:uppercase; letter-spacing:.06em;
+    text-decoration:none; color:var(--ink-soft); border-bottom:1px solid transparent;
+    padding-bottom:2px;
+  }
+  nav a:hover{color:var(--ink); border-bottom-color:var(--gold);}
+
+  section{padding:64px 0; border-bottom:1px solid var(--rule);}
+  section:last-of-type{border-bottom:none;}
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:.72rem; text-transform:uppercase;
+    letter-spacing:.14em; color:var(--gold); margin-bottom:.6em; display:block;
+  }
+
+  /* HERO */
+  .hero{padding-top:56px;}
+  .hero-grid{display:grid; grid-template-columns:1.1fr .9fr; gap:40px; align-items:start;}
+  @media(max-width:800px){.hero-grid{grid-template-columns:1fr;}}
+  .lede{font-size:1.08rem; max-width:46ch;}
+
+  /* LEDGER CARD (signature element) */
+  .ledger{
+    background:var(--paper-card);
+    border:1px solid var(--rule);
+    border-radius:var(--radius);
+    box-shadow: 0 1px 0 var(--rule), 0 12px 30px -18px rgba(23,36,32,0.35);
+    overflow:hidden;
+  }
+  .ledger-head{
+    padding:16px 20px; border-bottom:1px solid var(--rule);
+    display:flex; justify-content:space-between; align-items:center;
+    background:linear-gradient(180deg, var(--paper-2), var(--paper-card));
+  }
+  .ledger-head h3{margin:0;}
+  .ledger-head span{font-family:'IBM Plex Mono',monospace; font-size:.72rem; color:var(--ink-soft);}
+  .ledger-body{padding:20px;}
+  .field{margin-bottom:16px;}
+  .field label{display:flex; justify-content:space-between; font-size:.82rem; color:var(--ink-soft); margin-bottom:6px;}
+  .field label b{color:var(--ink); font-family:'IBM Plex Mono',monospace; font-weight:600;}
+  input[type=range]{
+    width:100%; -webkit-appearance:none; height:4px; border-radius:2px;
+    background:var(--rule); outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
+    background:var(--teal); cursor:pointer; border:2px solid var(--paper-card);
+    box-shadow:0 0 0 1px var(--teal);
+  }
+  input[type=number]{
+    width:100%; padding:8px 10px; border:1px solid var(--rule); border-radius:var(--radius);
+    font-family:'IBM Plex Mono', monospace; font-size:.9rem; background:#fff; color:var(--ink);
+  }
+
+  .row-out{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:10px 0; border-top:1px dashed var(--rule); font-family:'IBM Plex Mono',monospace;
+  }
+  .row-out:first-of-type{border-top:1px solid var(--ink); margin-top:8px; padding-top:14px;}
+  .row-out .lab{font-family:'Inter',sans-serif; color:var(--ink-soft); font-size:.86rem;}
+  .row-out .val{font-weight:600; font-size:1rem;}
+  .row-out.diff .val{color:var(--rust);}
+  .row-out.win .val{color:var(--teal);}
+
+  .stat-big{
+    font-family:'Fraunces',serif; font-size:2.6rem; color:var(--rust); line-height:1; margin:6px 0 2px 0;
+  }
+  .stat-cap{font-size:.85rem; color:var(--ink-soft);}
+
+  /* generic two-col */
+  .cols2{display:grid; grid-template-columns:1fr 1fr; gap:32px;}
+  @media(max-width:760px){.cols2{grid-template-columns:1fr;}}
+
+  .card{
+    background:var(--paper-card); border:1px solid var(--rule); border-radius:var(--radius); padding:20px;
+  }
+
+  /* basket builder */
+  .basket-bar{
+    display:flex; height:38px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--ink);
+    margin:18px 0 8px 0;
+  }
+  .seg{display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:.78rem; color:#fff; transition:width .15s ease;}
+  .seg.stocks{background:var(--teal);}
+  .seg.bonds{background:var(--gold);}
+  .seg.intl{background:var(--rust);}
+  .legend{display:flex; gap:18px; flex-wrap:wrap; font-size:.82rem; color:var(--ink-soft); margin-bottom:18px;}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .dot{width:10px; height:10px; border-radius:2px; display:inline-block;}
+  .dot.stocks{background:var(--teal);} .dot.bonds{background:var(--gold);} .dot.intl{background:var(--rust);}
+  .basket-examples{font-size:.85rem; color:var(--ink-soft); border-top:1px solid var(--rule); padding-top:14px; margin-top:6px;}
+  .basket-examples i{font-style:normal; font-family:'IBM Plex Mono',monospace; background:var(--teal-soft); padding:1px 6px; border-radius:2px;}
+
+  /* quiz */
+  .q{margin-bottom:22px; padding-bottom:22px; border-bottom:1px solid var(--rule);}
+  .q:last-of-type{border-bottom:none;}
+  .q p.qtext{color:var(--ink); font-weight:500; margin-bottom:10px;}
+  .opts{display:flex; flex-direction:column; gap:8px;}
+  .opt{
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--rule);
+    border-radius:var(--radius); cursor:pointer; background:#fff; font-size:.92rem;
+  }
+  .opt:hover{border-color:var(--teal);}
+  .opt input{accent-color:var(--teal);}
+  .quiz-result{
+    margin-top:10px; padding:18px 20px; border-radius:var(--radius); border:1px solid var(--gold);
+    background:var(--gold-soft); display:none;
+  }
+  .quiz-result.show{display:block;}
+  .quiz-result h3{margin-bottom:4px;}
+
+  /* table */
+  table{width:100%; border-collapse:collapse; font-size:.9rem;}
+  th,td{text-align:left; padding:12px 10px; border-bottom:1px solid var(--rule); vertical-align:top;}
+  th{font-family:'IBM Plex Mono', monospace; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft);}
+  td.name{font-weight:600; color:var(--ink); white-space:nowrap;}
+
+  /* glossary */
+  .gloss{display:grid; grid-template-columns:1fr 1fr; gap:0 40px;}
+  @media(max-width:760px){.gloss{grid-template-columns:1fr;}}
+  .gterm{padding:14px 0; border-bottom:1px solid var(--rule);}
+  .gterm dt{font-family:'IBM Plex Mono',monospace; font-weight:600; color:var(--teal); margin-bottom:4px;}
+  .gterm dd{margin:0; color:var(--ink-soft); font-size:.92rem;}
+
+  /* steps */
+  .steps{counter-reset:step;}
+  .step{display:flex; gap:16px; padding:16px 0; border-bottom:1px solid var(--rule);}
+  .step:last-child{border-bottom:none;}
+  .step .num{
+    counter-increment:step; font-family:'Fraunces',serif; font-size:1.4rem; color:var(--gold);
+    min-width:34px;
+  }
+  .step .num::before{content: counter(step);}
+  .step h3{margin-bottom:4px;}
+
+  footer{padding:36px 0 60px 0;}
+  .disclaimer{
+    font-size:.82rem; color:var(--ink-soft); background:var(--paper-2); border:1px solid var(--rule);
+    padding:16px 18px; border-radius:var(--radius);
+  }
+
+  .btn{
+    display:inline-block; background:var(--ink); color:var(--paper); border:none; padding:10px 18px;
+    font-family:'IBM Plex Mono',monospace; font-size:.82rem; letter-spacing:.04em; border-radius:var(--radius);
+    cursor:pointer; text-transform:uppercase;
+  }
+  .btn:hover{background:var(--teal);}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="mark">The Index Ledger</span>
+      <span class="tag">A field guide to ETF investing</span>
+    </div>
+    <nav>
+      <a href="#basics">Basics</a>
+      <a href="#calculator">Fee Ledger</a>
+      <a href="#basket">Build a Basket</a>
+      <a href="#quiz">Risk Quiz</a>
+      <a href="#types">ETF Types</a>
+      <a href="#glossary">Glossary</a>
+      <a href="#start">Getting Started</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">Entry 001 — First Principles</span>
+      <h1>An ETF is a basket of investments you buy with one trade.</h1>
+      <p class="lede">Instead of picking one company and hoping, an exchange-traded fund holds many — sometimes thousands — and trades on an exchange like a single stock. The two things that matter most are what's inside the basket, and what it costs to hold it. This page walks through both, plus a quiz, a basket builder, and a glossary, so you can go from curious to informed.</p>
+      <p class="lede">Nothing here is personal financial advice — think of it as the reference sheet you'd want before your first conversation with an advisor or your first trade.</p>
+    </div>
+
+    <div class="ledger" id="calculator">
+      <div class="ledger-head">
+        <h3>The Fee Ledger</h3>
+        <span>compounding, annualized</span>
+      </div>
+      <div class="ledger-body">
+        <div class="field">
+          <label>Starting amount <b class="mono" id="outStart">$10,000</b></label>
+          <input type="range" id="inStart" min="0" max="100000" step="500" value="10000">
+        </div>
+        <div class="field">
+          <label>Monthly contribution <b class="mono" id="outMonthly">$300</b></label>
+          <input type="range" id="inMonthly" min="0" max="3000" step="50" value="300">
+        </div>
+        <div class="field">
+          <label>Years invested <b class="mono" id="outYears">25</b></label>
+          <input type="range" id="inYears" min="1" max="40" step="1" value="25">
+        </div>
+        <div class="field">
+          <label>Expected annual return (before fees) <b class="mono" id="outReturn">7%</b></label>
+          <input type="range" id="inReturn" min="1" max="12" step="0.5" value="7">
+        </div>
+
+        <div class="row-out">
+          <span class="lab">Low-cost broad ETF · 0.05% fee</span>
+          <span class="val mono win" id="outLow">$0</span>
+        </div>
+        <div class="row-out">
+          <span class="lab">Typical active fund · 1.0% fee</span>
+          <span class="val mono" id="outHigh">$0</span>
+        </div>
+        <div class="row-out diff">
+          <span class="lab">Difference, same market return</span>
+          <span class="val mono" id="outDiff">$0</span>
+        </div>
+        <p style="font-size:.78rem; color:var(--ink-soft); margin:10px 0 0 0;">Illustrative math only — assumes both scenarios earn the same market return before fees. Real returns vary and are never guaranteed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="basics">
+  <div class="wrap cols2">
+    <div>
+      <span class="eyebrow">Entry 002 — Why ETFs Exist</span>
+      <h2>What actually makes an ETF an ETF</h2>
+      <p>Most ETFs are built to track an index — a fixed list of holdings like "the 500 largest U.S. companies" or "every investment-grade government bond." Rather than a manager guessing which stocks will win, the fund simply owns what's on the list, in proportion to the index's rules.</p>
+      <p>Because there's no team of analysts trying to beat the market, index ETFs are cheap to run — often a fraction of a percent per year — and that cost gets passed on to you as a lower fee, called the MER or expense ratio.</p>
+      <p>They also trade all day on an exchange, like a stock, which means you can buy or sell anytime the market is open, at whatever price it's trading for that moment.</p>
+    </div>
+    <div>
+      <span class="eyebrow">Entry 003 — ETF vs. Mutual Fund</span>
+      <h2>The short version</h2>
+      <p><strong>Diversification:</strong> one ETF can spread your money across hundreds or thousands of holdings, so a single company's bad quarter barely moves the needle.</p>
+      <p><strong>Cost:</strong> broad-market index ETFs typically charge far less per year than actively managed mutual funds, and that gap compounds enormously over decades — see the ledger above.</p>
+      <p><strong>Transparency:</strong> most ETFs publish their full holdings daily, so you always know what you own.</p>
+      <p><strong>Trade-off:</strong> you give up the (unlikely) chance that a star manager beats the market, in exchange for reliably capturing the market's own return, minus a very small fee.</p>
+    </div>
+  </div>
+</section>
+
+<section id="basket">
+  <div class="wrap">
+    <span class="eyebrow">Entry 004 — Build a Basket</span>
+    <h2>Sketch a sample allocation</h2>
+    <p class="lede">Move the sliders to see how a mix of domestic stocks, bonds, and international stocks might look. This is a rough sketch to build intuition, not a portfolio recommendation.</p>
+
+    <div class="card">
+      <div class="field">
+        <label>Domestic stocks <b class="mono" id="outStocks">60%</b></label>
+        <input type="range" id="inStocks" min="0" max="100" step="5" value="60">
+      </div>
+      <div class="field">
+        <label>Bonds <b class="mono" id="outBonds">30%</b></label>
+        <input type="range" id="inBonds" min="0" max="100" step="5" value="30">
+      </div>
+      <div class="field">
+        <label>International stocks <b class="mono" id="outIntl">10%</b></label>
+        <input type="range" id="inIntl" min="0" max="100" step="5" value="10">
+      </div>
+
+      <div class="basket-bar" id="basketBar">
+        <div class="seg stocks" style="width:60%">60%</div>
+        <div class="seg bonds" style="width:30%">30%</div>
+        <div class="seg intl" style="width:10%">10%</div>
+      </div>
+      <div class="legend">
+        <span><i class="dot stocks"></i>Domestic stocks</span>
+        <span><i class="dot bonds"></i>Bonds</span>
+        <span><i class="dot intl"></i>International stocks</span>
+      </div>
+      <div class="basket-examples">
+        A basket like this is usually built from three ETF categories: a <i>total domestic stock market</i> fund, a <i>total bond market</i> fund, and a <i>total international stock market</i> fund. Well-known examples of each category include funds such as VTI, BND, and VXUS in the U.S., or XIC, XBB, and XAW in Canada — named here only to show what these categories look like in practice, not as a recommendation.
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="quiz">
+  <div class="wrap">
+    <span class="eyebrow">Entry 005 — Risk Quiz</span>
+    <h2>What kind of investor are you, roughly?</h2>
+    <p class="lede">Four quick questions to get a general sense of risk tolerance — the kind of thing that shapes the stock-to-bond split above. This is a simplified sketch, not a substitute for a real risk assessment with an advisor.</p>
+
+    <div class="card">
+      <div class="q">
+        <p class="qtext">1. When will you likely need this money?</p>
+        <div class="opts">
+          <label class="opt"><input type="radio" name="q1" value="1"> Within 3 years</label>
+          <label class="opt"><input type="radio" name="q1" value="2"> 3–10 years</label>
+          <label class="opt"><input type="radio" name="q1" value="3"> 10+ years</label>
+        </div>
+      </div>
+      <div class="q">
+        <p class="qtext">2. Your investments drop 20% in a month. You:</p>
+        <div class="opts">
+          <label class="opt"><input type="radio" name="q2" value="1"> Sell to stop further loss</label>
+          <label class="opt"><input type="radio" name="q2" value="2"> Feel uneasy but hold on</label>
+          <label class="opt"><input type="radio" name="q2" value="3"> See it as a buying opportunity</label>
+        </div>
+      </div>
+      <div class="q">
+        <p class="qtext">3. How would you describe your investing experience?</p>
+        <div class="opts">
+          <label class="opt"><input type="radio" name="q3" value="1"> New to investing</label>
+          <label class="opt"><input type="radio" name="q3" value="2"> Some experience</label>
+          <label class="opt"><input type="radio" name="q3" value="3"> Experienced</label>
+        </div>
+      </div>
+      <div class="q">
+        <p class="qtext">4. What matters more to you?</p>
+        <div class="opts">
+          <label class="opt"><input type="radio" name="q4" value="1"> Protecting what I have</label>
+          <label class="opt"><input type="radio" name="q4" value="2"> A balance of growth and safety</label>
+          <label class="opt"><input type="radio" name="q4" value="3"> Maximizing long-term growth</label>
+        </div>
+      </div>
+
+      <button class="btn" onclick="scoreQuiz()">See my general profile</button>
+
+      <div class="quiz-result" id="quizResult">
+        <h3 id="quizProfile">—</h3>
+        <p id="quizDesc" style="margin-bottom:0;"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="types">
+  <div class="wrap">
+    <span class="eyebrow">Entry 006 — Categories</span>
+    <h2>Common types of ETFs</h2>
+    <table>
+      <thead>
+        <tr><th>Type</th><th>What it holds</th><th>Typical role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="name">Broad market</td><td>Hundreds or thousands of domestic stocks tracking a whole-market or large-cap index</td><td>Core holding, long-term growth</td></tr>
+        <tr><td class="name">Bond</td><td>Government or corporate debt across various maturities</td><td>Stability, income, dampens volatility</td></tr>
+        <tr><td class="name">International</td><td>Stocks from outside your home country, developed and/or emerging markets</td><td>Diversification beyond one economy</td></tr>
+        <tr><td class="name">Sector / thematic</td><td>A narrow slice — e.g. energy, technology, or a specific trend</td><td>Targeted bets, higher concentration risk</td></tr>
+        <tr><td class="name">Dividend / income</td><td>Companies with a history of paying dividends</td><td>Income focus, often lower volatility</td></tr>
+        <tr><td class="name">Commodity</td><td>Physical goods or futures — gold, oil, agriculture</td><td>Inflation hedge, diversification</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="glossary">
+  <div class="wrap">
+    <span class="eyebrow">Entry 007 — Glossary</span>
+    <h2>Terms worth knowing</h2>
+    <dl class="gloss">
+      <div class="gterm"><dt>MER / Expense Ratio</dt><dd>The annual fee, as a percentage of your investment, charged to run the fund. Lower is generally better, all else equal.</dd></div>
+      <div class="gterm"><dt>NAV</dt><dd>Net Asset Value — the per-share value of everything the fund owns, calculated once a day.</dd></div>
+      <div class="gterm"><dt>Tracking error</dt><dd>How closely a fund's actual return matches the index it's supposed to follow. Smaller is better.</dd></div>
+      <div class="gterm"><dt>Diversification</dt><dd>Spreading money across many holdings so no single one can do outsized damage.</dd></div>
+      <div class="gterm"><dt>Distribution yield</dt><dd>The income (dividends or interest) a fund has recently paid out, shown as a percentage of its price.</dd></div>
+      <div class="gterm"><dt>Rebalancing</dt><dd>Periodically buying or selling to bring your allocation back to your target mix.</dd></div>
+      <div class="gterm"><dt>Ticker symbol</dt><dd>The short code a fund trades under on an exchange — e.g. four letters you'd type into a brokerage.</dd></div>
+      <div class="gterm"><dt>Index</dt><dd>A defined, rules-based list of holdings — like "the 500 largest U.S. public companies" — that a fund can be built to track.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <span class="eyebrow">Entry 008 — Getting Started</span>
+    <h2>A general starting sequence</h2>
+    <div class="steps">
+      <div class="step"><span class="num"></span><div><h3>Open a brokerage account</h3><p>Any regulated broker that lists ETFs will work — compare trading fees and account minimums.</p></div></div>
+      <div class="step"><span class="num"></span><div><h3>Choose the right account type</h3><p>Tax-advantaged accounts (like a 401(k)/IRA in the U.S. or a TFSA/RRSP in Canada) often make sense before a regular taxable account, depending on your situation.</p></div></div>
+      <div class="step"><span class="num"></span><div><h3>Set a target allocation</h3><p>Use your time horizon and risk comfort — like the quiz above — to sketch a stocks-to-bonds split.</p></div></div>
+      <div class="step"><span class="num"></span><div><h3>Favor low, transparent costs</h3><p>Compare the MER of similar funds; over decades, small differences in fees compound into large differences in outcome.</p></div></div>
+      <div class="step"><span class="num"></span><div><h3>Automate contributions</h3><p>Regular investing on a schedule removes guesswork about timing the market.</p></div></div>
+      <div class="step"><span class="num"></span><div><h3>Rebalance occasionally</h3><p>Once or twice a year, nudge your holdings back toward your target mix.</p></div></div>
+      <div class="step"><span class="num"></span><div><h3>Stay the course</h3><p>Markets move in both directions; the historical edge in index investing has come from time in the market, not timing it.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="disclaimer">
+      This page is for general education only and is not financial, investment, tax, or legal advice. It doesn't account for your personal circumstances. ETF values fluctuate and can lose money; past performance does not guarantee future results. Consider speaking with a licensed financial advisor before investing.
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ---- Fee ledger calculator ----
+  const $ = id => document.getElementById(id);
+  const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
+
+  function futureValue(start, monthly, years, annualRatePct){
+    const r = annualRatePct/100/12;
+    const n = years*12;
+    let fv = start * Math.pow(1+r, n);
+    if(r === 0){
+      fv += monthly*n;
+    } else {
+      fv += monthly * ((Math.pow(1+r,n)-1)/r);
+    }
+    return fv;
+  }
+
+  function updateCalc(){
+    const start = +$('inStart').value;
+    const monthly = +$('inMonthly').value;
+    const years = +$('inYears').value;
+    const ret = +$('inReturn').value;
+
+    $('outStart').textContent = fmt(start);
+    $('outMonthly').textContent = fmt(monthly);
+    $('outYears').textContent = years;
+    $('outReturn').textContent = ret + '%';
+
+    const low = futureValue(start, monthly, years, ret - 0.05);
+    const high = futureValue(start, monthly, years, ret - 1.0);
+    const diff = low - high;
+
+    $('outLow').textContent = fmt(low);
+    $('outHigh').textContent = fmt(high);
+    $('outDiff').textContent = fmt(diff);
+  }
+  ['inStart','inMonthly','inYears','inReturn'].forEach(id => $(id).addEventListener('input', updateCalc));
+  updateCalc();
+
+  // ---- Basket builder (auto-normalize to 100) ----
+  function updateBasket(changed){
+    let s = +$('inStocks').value;
+    let b = +$('inBonds').value;
+    let i = +$('inIntl').value;
+    let total = s+b+i;
+
+    if(total !== 100 && total > 0){
+      // proportionally scale the other two to make room, keeping 'changed' fixed
+      const others = ['inStocks','inBonds','inIntl'].filter(id=>id!==changed);
+      let vals = others.map(id=>+$(id).value);
+      let othersSum = vals.reduce((a,b)=>a+b,0);
+      const target = 100 - (+$(changed).value);
+      if(othersSum > 0){
+        others.forEach((id,idx)=>{
+          const scaled = Math.round((vals[idx]/othersSum) * Math.max(target,0));
+          $(id).value = scaled;
+        });
+      } else {
+        others.forEach(id=>$(id).value = Math.max(target,0)/others.length);
+      }
+    }
+
+    s = +$('inStocks').value; b = +$('inBonds').value; i = +$('inIntl').value;
+    // fix rounding drift on the last one
+    let drift = 100 - (s+b+i);
+    if(drift !== 0 && changed){
+      const fixId = ['inStocks','inBonds','inIntl'].find(id=>id!==changed);
+      $(fixId).value = Math.max(0, +$(fixId).value + drift);
+    }
+    s = +$('inStocks').value; b = +$('inBonds').value; i = +$('inIntl').value;
+
+    $('outStocks').textContent = s+'%';
+    $('outBonds').textContent = b+'%';
+    $('outIntl').textContent = i+'%';
+
+    const bar = $('basketBar');
+    bar.innerHTML = `
+      <div class="seg stocks" style="width:${s}%">${s>7? s+'%':''}</div>
+      <div class="seg bonds" style="width:${b}%">${b>7? b+'%':''}</div>
+      <div class="seg intl" style="width:${i}%">${i>7? i+'%':''}</div>
+    `;
+  }
+  $('inStocks').addEventListener('input', ()=>updateBasket('inStocks'));
+  $('inBonds').addEventListener('input', ()=>updateBasket('inBonds'));
+  $('inIntl').addEventListener('input', ()=>updateBasket('inIntl'));
+
+  // ---- Risk quiz ----
+  function scoreQuiz(){
+    const names = ['q1','q2','q3','q4'];
+    let total = 0, answered = 0;
+    names.forEach(n=>{
+      const sel = document.querySelector(`input[name="${n}"]:checked`);
+      if(sel){ total += (+sel.value); answered++; }
+    });
+    const box = $('quizResult');
+    if(answered < 4){
+      $('quizProfile').textContent = 'Answer all four to see a profile';
+      $('quizDesc').textContent = '';
+      box.classList.add('show');
+      return;
+    }
+    let profile, desc;
+    if(total <= 5){
+      profile = 'Conservative — sketch: roughly 20–40% stocks, 60–80% bonds';
+      desc = "You lean toward protecting principal and a shorter time horizon. A bond-heavy mix tends to be steadier, with lower expected long-term growth in exchange.";
+    } else if(total <= 8){
+      profile = 'Balanced — sketch: roughly 50–65% stocks, 35–50% bonds';
+      desc = "You're weighing growth and stability fairly evenly. A blended mix aims to smooth out the ride while still capturing meaningful long-term growth.";
+    } else if(total <= 10){
+      profile = 'Growth-leaning — sketch: roughly 75–90% stocks, 10–25% bonds';
+      desc = "You have time and tolerance for ups and downs. A stock-heavy mix historically trends toward higher long-term growth, with larger short-term swings.";
+    } else {
+      profile = 'Aggressive — sketch: roughly 90–100% stocks';
+      desc = "You're prioritizing long-term growth over short-term comfort. This mix leans fully into equities, including international exposure, and expects real volatility along the way.";
+    }
+    $('quizProfile').textContent = profile;
+    $('quizDesc').textContent = desc;
+    box.classList.add('show');
+  }
+</script>
+
+</body>
+</html>
